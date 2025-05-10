@@ -13,14 +13,6 @@ MAPBOX_TOKEN_PATH = 'mapbox_token.txt'
 LOCATIONS_PATH = 'locations.json'
 
 VALID_HOURS = [6, 7, 8, 9, 15, 16, 17, 18]
-HOME = (4.2800987, 52.0903108)
-WORK = (4.3139142, 52.0802853)
-LOCS = {
-  'Catshuis': HOME,
-  'Paleis Noordeinde': (4.3058141, 52.0808956),
-  'Paleis Het Loo': (5.9445656, 52.2341768),
-  'Paleis Huis ten Bosch': (4.341751, 52.093172),
-}
 
 def log(line, fn='out.log'):
   path = os.path.join(os.path.dirname(__file__), LOG_DIR, fn)
@@ -92,7 +84,7 @@ def load_locations():
   with open(LOCATIONS_PATH, 'r') as fp:
     return json.load(fp)
 
-def main(test=False, multi=False):
+def main(test=False):
   departure = datetime.datetime.now().astimezone(tz=pytz.timezone('Europe/Amsterdam'))
   if departure.hour not in VALID_HOURS and not test:
     return
@@ -100,11 +92,8 @@ def main(test=False, multi=False):
   locations = load_locations()
 
   directions = []
-  if multi:
-    for n, c in locations['locations'].items():
-      directions.append((n, [c, locations['work']]))
-  else:
-    directions.append((None, [next(iter(locations['locations'].values())), locations['work']]))
+  for n, c in locations['locations'].items():
+    directions.append((n, [c, locations['work']]))
 
   entries = []
   for name, direction in directions:
@@ -128,12 +117,11 @@ def main(test=False, multi=False):
   if test:
     print(res)
   else:
-    log(res + '\n', 'multi.log' if multi else 'out.log')
+    log(res + '\n')
 
 if __name__ == '__main__':
   args = {
     'test': '--test' in sys.argv,
-    'multi': '--multi' in sys.argv,
   }
 
   main(**args)

@@ -12,17 +12,17 @@ import matplotlib
 matplotlib.use('tkagg')
 from matplotlib import pyplot as plt
 from matplotlib import dates as mdates
-from main import LOCS
+from main import load_locations
 
 LOG_DIR = 'out'
 DAYS = [None, 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saterday', 'sunday']
 
 NestedDict = lambda: defaultdict(NestedDict)
 
-def multi_():
+def parse_data():
   res = NestedDict()
 
-  path = os.path.join(os.path.dirname(__file__), LOG_DIR, 'multi.log')
+  path = os.path.join(os.path.dirname(__file__), LOG_DIR, 'out.log')
   with open(path, 'r') as f:
     for i, l in enumerate(f):
       try:
@@ -31,12 +31,14 @@ def multi_():
         print(f'JSON parse error on line {i+1}')
         raise
 
-      assert len(json_) == len(LOCS)
+      locations = load_locations()
+
+      assert len(json_) == len(locations['locations'])
       for i, e in enumerate(json_):
         if e['is_weekend']:
           continue
 
-        name = list(LOCS.keys())[i]
+        name = list(locations['locations'].keys())[i]
         morning = 'morning' if e['is_morning'] else 'afternoon'
         day = e['isoweekday']
         time = datetime.datetime(year=1970, month=1, day=1, hour=e['hour'], minute=e['minute'])
@@ -50,36 +52,8 @@ def multi_():
 
   return res
 
-def normal():
-  res = NestedDict()
-
-  path = os.path.join(os.path.dirname(__file__), LOG_DIR, 'out.log')
-  with open(path, 'r') as f:
-    for i, l in enumerate(f):
-      try:
-        e = json.loads(l)[0]
-      except Exception:
-        print(f'JSON parse error on line {i+1}')
-        raise
-
-      morning = 'morning' if e['is_morning'] else 'afternoon'
-      day = e['isoweekday']
-      time = datetime.datetime(year=1970, month=1, day=1, hour=e['hour'], minute=e['minute'])
-
-      if isinstance(res[morning][day][time], defaultdict):
-        res[morning][day][time] = []
-
-      duration = e['route']['duration']
-
-      res[morning][day][time].append(duration)
-
-  return res
-
-def analyze(multi=False):
-  if multi:
-    data = multi_()
-  else:
-    data = normal()
+def analyze():
+  data = parse_data()
 
   ymin = float('inf')
   ymax = float('-inf')
@@ -129,8 +103,4 @@ def analyze(multi=False):
   plt.show()
 
 if __name__ == '__main__':
-  args = {
-    'multi': '--multi' in sys.argv,
-  }
-
-  analyze(**args)
+  analyze()
