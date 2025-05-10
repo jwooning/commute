@@ -4,42 +4,42 @@ import os
 import sys
 import datetime
 import json
+import argparse
 
 import pytz
 import requests
 
-LOG_DIR = 'out'
-MAPBOX_TOKEN_PATH = 'mapbox_token.txt'
-LOCATIONS_PATH = 'locations.json'
-
 VALID_HOURS = [6, 7, 8, 9, 15, 16, 17, 18]
 
 class Commute:
+  log_dir = None
+  test_mode = None
   mapbox_token = None
 
   work = None
   locs = None
 
-  def __init__(self):
-    self.log_dir = LOG_DIR
+  def __init__(self, log_dir, mapbox_token_path, locations_path, test_mode):
+    self.test_mode = test_mode
+    self.log_dir = log_dir
 
     try:
-      with open(MAPBOX_TOKEN_PATH, 'r') as fp:
+      with open(mapbox_token_path, 'r') as fp:
         self.mapbox_token = fp.read().strip()
     except Exception:
-      print(f'cannot read {MAPBOX_TOKEN_PATH}, must be manually added, see readme')
+      print(f'cannot read {mapbox_token_path}, must be manually added, see readme')
       sys.exit(1)
 
-    self.work, self.locs = Commute.load_locations()
+    self.work, self.locs = Commute.load_locations(locations_path)
 
   @staticmethod
-  def load_locations():
-    with open(LOCATIONS_PATH, 'r') as fp:
+  def load_locations(path):
+    with open(path, 'r') as fp:
       locations = json.load(fp)
       return locations['work'], locations['locations']
 
   def log(self, line, fn='out.log'):
-    path = os.path.join(os.path.dirname(__file__), LOG_DIR, fn)
+    path = os.path.join(os.path.dirname(__file__), self.log_dir, fn)
     with open(path, 'a') as f:
       f.write(line)
 
@@ -97,9 +97,9 @@ class Commute:
 
     return entry
 
-  def main(self, test=False):
+  def main(self):
     departure = datetime.datetime.now().astimezone(tz=pytz.timezone('Europe/Amsterdam'))
-    if departure.hour not in VALID_HOURS and not test:
+    if departure.hour not in VALID_HOURS and not self.test_mode:
       return
 
     directions = []
@@ -125,15 +125,19 @@ class Commute:
       entries.append(self.direction_routes(direction, add_))
 
     res = json.dumps(entries)
-    if test:
+    if self.test_mode:
       print(res)
     else:
       self.log(res + '\n')
 
 if __name__ == '__main__':
-  args = {
-    'test': '--test' in sys.argv,
-  }
+  parser = argparse.ArgumentParser(prog='Commute', description='analyze traffic for possible commutes')
+  parser.add_argument('--test', action='store_true', help='output to terminal instead of log')
+  parser.add_argument('--log-dir', default='out', metavar='PATH', help='directory where logs are stored')
+  parser.add_argument('--mapbox-token', default='mapbox_token.txt', metavar='PATH', help='file containing mapbox token')
+  parser.add_argument('--locations', default='locations.json', metavar='PATH', help='file containing locations')
 
-  comm = Commute()
-  comm.main(**args)
+  args = parser.parse_args()
+
+  comm = Commute(args.log_dir, args.mapbox_token, args.locations, args.test)
+  comm.main()
