@@ -12,16 +12,17 @@ import requests
 VALID_HOURS = [6, 7, 8, 9, 15, 16, 17, 18]
 
 class Commute:
-  log_dir = None
+  log_path = None
   test_mode = None
   mapbox_token = None
+  tz = None
 
   work = None
   locs = None
 
-  def __init__(self, log_dir, mapbox_token_path, locations_path, test_mode):
+  def __init__(self, log_path, mapbox_token_path, locations_path, timezone, test_mode):
     self.test_mode = test_mode
-    self.log_dir = log_dir
+    self.log_path = log_path
 
     try:
       with open(mapbox_token_path, 'r') as fp:
@@ -32,14 +33,16 @@ class Commute:
 
     self.work, self.locs = Commute.load_locations(locations_path)
 
+    self.tz = pytz.timezone(timezone)
+
   @staticmethod
   def load_locations(path):
     with open(path, 'r') as fp:
       locations = json.load(fp)
       return locations['work'], locations['locations']
 
-  def log(self, line, fn='out.log'):
-    path = os.path.join(os.path.dirname(__file__), self.log_dir, fn)
+  def log(self, line):
+    path = os.path.join(os.path.dirname(__file__), self.log_path)
     with open(path, 'a') as f:
       f.write(line)
 
@@ -60,7 +63,8 @@ class Commute:
     json_ = resp.json()
     return json_['routes']
 
-  def filter_route(self, r):
+  @staticmethod
+  def filter_route(r):
     res = {}
 
     res['duration'] = r['duration']
@@ -92,13 +96,13 @@ class Commute:
 
     entry = additional.copy()
 
-    entry['route'] = self.filter_route(route)
+    entry['route'] = Commute.filter_route(route)
     entry['route_alt'] = self.filter_route(route_alt) if len(routes) > 1 else None
 
     return entry
 
   def main(self):
-    departure = datetime.datetime.now().astimezone(tz=pytz.timezone('Europe/Amsterdam'))
+    departure = datetime.datetime.now().astimezone(tz=self.tz)
     if departure.hour not in VALID_HOURS and not self.test_mode:
       return
 
@@ -133,11 +137,12 @@ class Commute:
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(prog='Commute', description='analyze traffic for possible commutes')
   parser.add_argument('--test', action='store_true', help='output to terminal instead of log')
-  parser.add_argument('--log-dir', default='out', metavar='PATH', help='directory where logs are stored')
+  parser.add_argument('--log', default='out/out.log', metavar='PATH', help='file where results are stored')
   parser.add_argument('--mapbox-token', default='mapbox_token.txt', metavar='PATH', help='file containing mapbox token')
   parser.add_argument('--locations', default='locations.json', metavar='PATH', help='file containing locations')
+  parser.add_argument('--timezone', default='Europe/Amsterdam', metavar='ZONE', help='timezone, default Europe/Amsterdam')
 
   args = parser.parse_args()
 
-  comm = Commute(args.log_dir, args.mapbox_token, args.locations, args.test)
+  comm = Commute(args.log, args.mapbox_token, args.locations, args.timezone, args.test)
   comm.main()
