@@ -22,4 +22,4 @@ analyze traffic for possible commutes
     * this will run the script every 15 minutes
 * wait for a while to gather data
 * analyze data using analyze script
-  * `./analyze.py
+  * `./analyze.py`
