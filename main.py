@@ -14,114 +14,126 @@ LOCATIONS_PATH = 'locations.json'
 
 VALID_HOURS = [6, 7, 8, 9, 15, 16, 17, 18]
 
-def log(line, fn='out.log'):
-  path = os.path.join(os.path.dirname(__file__), LOG_DIR, fn)
-  with open(path, 'a') as f:
-    f.write(line)
+class Commute:
+  mapbox_token = None
 
-def api_request(coordinates):
-  try:
-    with open(MAPBOX_TOKEN_PATH, 'r') as fp:
-      mapbox_token = fp.read().strip()
-  except Exception:
-    print(f'cannot read {MAPBOX_TOKEN_PATH}, must be manually added, see readme')
-    sys.exit(1)
+  work = None
+  locs = None
 
-  url = 'https://api.mapbox.com/directions/v5/mapbox/driving-traffic/'
-  url += ';'.join([','.join([str(x) for x in coords]) for coords in coordinates])
-  url += '?access_token=' + mapbox_token
-  url += '&alternatives=true'
-  url += '&annotations=distance,duration,congestion_numeric,closure'
-  url += '&overview=full'
-  url += '&geometries=geojson'
+  def __init__(self):
+    self.log_dir = LOG_DIR
 
-  resp = requests.get(url)
+    try:
+      with open(MAPBOX_TOKEN_PATH, 'r') as fp:
+        self.mapbox_token = fp.read().strip()
+    except Exception:
+      print(f'cannot read {MAPBOX_TOKEN_PATH}, must be manually added, see readme')
+      sys.exit(1)
 
-  if resp.status_code != 200:
-    raise Exception(f'Failed api request: {resp.status_code}, {resp.text}')
+    self.work, self.locs = Commute.load_locations()
 
-  json_ = resp.json()
-  return json_['routes']
+  @staticmethod
+  def load_locations():
+    with open(LOCATIONS_PATH, 'r') as fp:
+      locations = json.load(fp)
+      return locations['work'], locations['locations']
 
-def filter_route(r):
-  res = {}
+  def log(self, line, fn='out.log'):
+    path = os.path.join(os.path.dirname(__file__), LOG_DIR, fn)
+    with open(path, 'a') as f:
+      f.write(line)
 
-  res['duration'] = r['duration']
-  res['duration_typical'] = r['duration_typical']
-  res['distance'] = r['distance']
+  def api_request(self, coordinates):
+    url = 'https://api.mapbox.com/directions/v5/mapbox/driving-traffic/'
+    url += ';'.join([','.join([str(x) for x in coords]) for coords in coordinates])
+    url += '?access_token=' + self.mapbox_token
+    url += '&alternatives=true'
+    url += '&annotations=distance,duration,congestion_numeric,closure'
+    url += '&overview=full'
+    url += '&geometries=geojson'
 
-  assert len(r['legs']) == 1
-  assert len(r['geometry']['coordinates']) == len(r['legs'][0]['annotation']['congestion_numeric']) + 1
+    resp = requests.get(url)
 
-  res['summary'] = r['legs'][0]['summary']
-  res['incidents'] = r['legs'][0].get('incidents', [])
-  res['closures'] = r['legs'][0].get('closures', [])
-  res['step_coordinates'] = r['geometry']['coordinates']
-  res['step_congestion'] = r['legs'][0]['annotation']['congestion_numeric']
-  res['step_duration'] = r['legs'][0]['annotation']['duration']
-  res['step_distance'] = r['legs'][0]['annotation']['distance']
+    if resp.status_code != 200:
+      raise Exception(f'Failed api request: {resp.status_code}, {resp.text}')
 
-  return res
+    json_ = resp.json()
+    return json_['routes']
 
-def direction_routes(direction, additional):
-  routes = api_request(direction)
+  def filter_route(self, r):
+    res = {}
 
-  route = routes[0]
-  route_alt = None
-  if len(routes) > 1:
-    route_alt = routes[1]
-    if routes[0]['duration'] > routes[1]['duration']:
-      route, route_alt = route_alt, route
+    res['duration'] = r['duration']
+    res['duration_typical'] = r['duration_typical']
+    res['distance'] = r['distance']
 
-  entry = additional.copy()
+    assert len(r['legs']) == 1
+    assert len(r['geometry']['coordinates']) == len(r['legs'][0]['annotation']['congestion_numeric']) + 1
 
-  entry['route'] = filter_route(route)
-  entry['route_alt'] = filter_route(route_alt) if len(routes) > 1 else None
+    res['summary'] = r['legs'][0]['summary']
+    res['incidents'] = r['legs'][0].get('incidents', [])
+    res['closures'] = r['legs'][0].get('closures', [])
+    res['step_coordinates'] = r['geometry']['coordinates']
+    res['step_congestion'] = r['legs'][0]['annotation']['congestion_numeric']
+    res['step_duration'] = r['legs'][0]['annotation']['duration']
+    res['step_distance'] = r['legs'][0]['annotation']['distance']
 
-  return entry
+    return res
 
-def load_locations():
-  with open(LOCATIONS_PATH, 'r') as fp:
-    return json.load(fp)
+  def direction_routes(self, direction, additional):
+    routes = self.api_request(direction)
 
-def main(test=False):
-  departure = datetime.datetime.now().astimezone(tz=pytz.timezone('Europe/Amsterdam'))
-  if departure.hour not in VALID_HOURS and not test:
-    return
+    route = routes[0]
+    route_alt = None
+    if len(routes) > 1:
+      route_alt = routes[1]
+      if routes[0]['duration'] > routes[1]['duration']:
+        route, route_alt = route_alt, route
 
-  locations = load_locations()
+    entry = additional.copy()
 
-  directions = []
-  for n, c in locations['locations'].items():
-    directions.append((n, [c, locations['work']]))
+    entry['route'] = self.filter_route(route)
+    entry['route_alt'] = self.filter_route(route_alt) if len(routes) > 1 else None
 
-  entries = []
-  for name, direction in directions:
-    if departure.hour > 12:
-      direction = direction[::-1]
+    return entry
 
-    add_ = {
-      'departure': departure.isoformat(),
-      'is_weekend': departure.isoweekday() >= 6,
-      'is_morning': departure.hour <= 12,
-      'isoweekday': departure.isoweekday(),
-      'hour': departure.hour,
-      'minute': departure.minute,
-    }
-    if name is not None:
-      add_['name']: name
+  def main(self, test=False):
+    departure = datetime.datetime.now().astimezone(tz=pytz.timezone('Europe/Amsterdam'))
+    if departure.hour not in VALID_HOURS and not test:
+      return
 
-    entries.append(direction_routes(direction, add_))
+    directions = []
+    for n, c in self.locs.items():
+      directions.append((n, [c, self.work]))
 
-  res = json.dumps(entries)
-  if test:
-    print(res)
-  else:
-    log(res + '\n')
+    entries = []
+    for name, direction in directions:
+      if departure.hour > 12:
+        direction = direction[::-1]
+
+      add_ = {
+        'departure': departure.isoformat(),
+        'is_weekend': departure.isoweekday() >= 6,
+        'is_morning': departure.hour <= 12,
+        'isoweekday': departure.isoweekday(),
+        'hour': departure.hour,
+        'minute': departure.minute,
+      }
+      if name is not None:
+        add_['name']: name
+
+      entries.append(self.direction_routes(direction, add_))
+
+    res = json.dumps(entries)
+    if test:
+      print(res)
+    else:
+      self.log(res + '\n')
 
 if __name__ == '__main__':
   args = {
     'test': '--test' in sys.argv,
   }
 
-  main(**args)
+  comm = Commute()
+  comm.main(**args)
