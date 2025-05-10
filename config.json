@@ -1,4 +1,8 @@
 {
+  "timezone": "Europe/Amsterdam",
+  "days": [1, 2, 3, 4, 5],
+  "departure_hours": [6, 7, 8, 9],
+  "return_hours": [15, 16, 17, 18],
   "work": [4.3139142, 52.0802853],
   "locations": {
     "Catshuis": [4.2800987, 52.0903108],

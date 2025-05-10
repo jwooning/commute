@@ -9,18 +9,25 @@ import argparse
 import pytz
 import requests
 
-VALID_HOURS = [6, 7, 8, 9, 15, 16, 17, 18]
+class Config:
+  def __init__(self, path):
+    with open(path, 'r') as fp:
+      data = json.load(fp)
+
+      self.tz = pytz.timezone(data['timezone'])
+      self.days = data['days']
+      self.departs = data['departure_hours']
+      self.returns = data['return_hours']
+      self.work = data['work']
+      self.locs = data['locations']
 
 class Commute:
   log_path = None
-  test_mode = None
   mapbox_token = None
-  tz = None
+  config = None
+  test_mode = None
 
-  work = None
-  locs = None
-
-  def __init__(self, log_path, mapbox_token_path, locations_path, timezone, test_mode):
+  def __init__(self, log_path, mapbox_token_path, config_path, test_mode):
     self.test_mode = test_mode
     self.log_path = log_path
 
@@ -31,15 +38,7 @@ class Commute:
       print(f'cannot read {mapbox_token_path}, must be manually added, see readme')
       sys.exit(1)
 
-    self.work, self.locs = Commute.load_locations(locations_path)
-
-    self.tz = pytz.timezone(timezone)
-
-  @staticmethod
-  def load_locations(path):
-    with open(path, 'r') as fp:
-      locations = json.load(fp)
-      return locations['work'], locations['locations']
+    self.config = Config(config_path)
 
   def log(self, line):
     path = os.path.join(os.path.dirname(__file__), self.log_path)
@@ -102,23 +101,24 @@ class Commute:
     return entry
 
   def main(self):
-    departure = datetime.datetime.now().astimezone(tz=self.tz)
-    if departure.hour not in VALID_HOURS and not self.test_mode:
+    departure = datetime.datetime.now().astimezone(tz=self.config.tz)
+    dt_valid = departure.isoweekday() in self.config.days and \
+               (departure.hour in self.config.departs or departure.hour in self.config.returns)
+    if not dt_valid and not self.test_mode:
       return
 
     directions = []
-    for n, c in self.locs.items():
-      directions.append((n, [c, self.work]))
+    for n, c in self.config.locs.items():
+      directions.append((n, [c, self.config.work]))
 
     entries = []
     for name, direction in directions:
-      if departure.hour > 12:
+      if departure.hour in self.config.returns:
         direction = direction[::-1]
 
       add_ = {
         'departure': departure.isoformat(),
-        'is_weekend': departure.isoweekday() >= 6,
-        'is_morning': departure.hour <= 12,
+        'is_morning': departure.hour in self.config.departs,
         'isoweekday': departure.isoweekday(),
         'hour': departure.hour,
         'minute': departure.minute,
@@ -139,10 +139,9 @@ if __name__ == '__main__':
   parser.add_argument('--test', action='store_true', help='output to terminal instead of log')
   parser.add_argument('--log', default='out/out.log', metavar='PATH', help='file where results are stored')
   parser.add_argument('--mapbox-token', default='mapbox_token.txt', metavar='PATH', help='file containing mapbox token')
-  parser.add_argument('--locations', default='locations.json', metavar='PATH', help='file containing locations')
-  parser.add_argument('--timezone', default='Europe/Amsterdam', metavar='ZONE', help='timezone, default Europe/Amsterdam')
+  parser.add_argument('--config', default='config.json', metavar='PATH', help='configuration file path')
 
   args = parser.parse_args()
 
-  comm = Commute(args.log, args.mapbox_token, args.locations, args.timezone, args.test)
+  comm = Commute(args.log, args.mapbox_token, args.config, args.test)
   comm.main()

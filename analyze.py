@@ -11,20 +11,18 @@ import matplotlib
 matplotlib.use('tkagg')
 from matplotlib import pyplot as plt
 from matplotlib import dates as mdates
-from main import Commute
+from main import Config
 
 NestedDict = lambda: defaultdict(NestedDict)
 
 class CommuteAnalyze:
   log_path = None
+  config = None
 
-  work = None
-  locs = None
-
-  def __init__(self, log_path, locations_path):
+  def __init__(self, log_path, config_path):
     self.log_path = log_path
 
-    self.work, self.locs = Commute.load_locations(locations_path)
+    self.config = Config(config_path)
 
   def parse_data(self):
     res = NestedDict()
@@ -38,12 +36,9 @@ class CommuteAnalyze:
           print(f'JSON parse error on line {i+1}')
           raise
 
-        assert len(json_) == len(self.locs)
+        assert len(json_) == len(self.config.locs)
         for i, e in enumerate(json_):
-          if e['is_weekend']:
-            continue
-
-          name = list(self.locs.keys())[i]
+          name = list(self.config.locs.keys())[i]
           morning = 'morning' if e['is_morning'] else 'afternoon'
           day = e['isoweekday']
           time = datetime.datetime(year=1970, month=1, day=1, hour=e['hour'], minute=e['minute'])
@@ -108,9 +103,9 @@ class CommuteAnalyze:
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(prog='CommuteAnalyze', description='analyze traffic for possible commutes')
   parser.add_argument('--log', default='out/out.log', metavar='PATH', help='file where results are stored')
-  parser.add_argument('--locations', default='locations.json', metavar='PATH', help='file containing locations')
+  parser.add_argument('--config', default='config.json', metavar='PATH', help='configuration file path')
 
   args = parser.parse_args()
 
-  comm = CommuteAnalyze(args.log, args.locations)
+  comm = CommuteAnalyze(args.log, args.config)
   comm.analyze()

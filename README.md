@@ -7,10 +7,11 @@ analyze traffic for possible commutes
   * create access token: https://console.mapbox.com/account/access-tokens/
   * create token with access to directions api, or use default public token
   * copy token to `mapbox_token.txt`
-* configure locations:
-  * edit `locations.json`
+* configure:
+  * edit `config.json`
   * gps coordinates are formatted as `[LON, LAT]`
   * fill in work destination and possible starting positions
+  * check if timezone and hours/days are correct
 * install requirements:
   * `pip install -r requirements.txt`
 * test program:
