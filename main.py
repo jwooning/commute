@@ -27,8 +27,12 @@ def log(line, fn='out.log'):
     f.write(line)
 
 def api_request(coordinates):
-  with open(MAPBOX_TOKEN_PATH, 'r') as fp:
-    mapbox_token = fp.read().strip()
+  try:
+    with open(MAPBOX_TOKEN_PATH, 'r') as fp:
+      mapbox_token = fp.read().strip()
+  except Exception:
+    print(f'cannot read {MAPBOX_TOKEN_PATH}, must be manually added, see readme')
+    sys.exit(1)
 
   url = 'https://api.mapbox.com/directions/v5/mapbox/driving-traffic/'
   url += ';'.join([','.join([str(x) for x in coords]) for coords in coordinates])
