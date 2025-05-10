@@ -8,8 +8,9 @@ import json
 import pytz
 import requests
 
-MAPBOX_TOKEN_PATH = 'mapbox_token.txt'
 LOG_DIR = 'out'
+MAPBOX_TOKEN_PATH = 'mapbox_token.txt'
+LOCATIONS_PATH = 'locations.json'
 
 VALID_HOURS = [6, 7, 8, 9, 15, 16, 17, 18]
 HOME = (4.2800987, 52.0903108)
@@ -87,17 +88,23 @@ def direction_routes(direction, additional):
 
   return entry
 
+def load_locations():
+  with open(LOCATIONS_PATH, 'r') as fp:
+    return json.load(fp)
+
 def main(test=False, multi=False):
   departure = datetime.datetime.now().astimezone(tz=pytz.timezone('Europe/Amsterdam'))
   if departure.hour not in VALID_HOURS and not test:
     return
 
+  locations = load_locations()
+
   directions = []
   if multi:
-    for n, c in LOCS.items():
-      directions.append((n, [c, WORK]))
+    for n, c in locations['locations'].items():
+      directions.append((n, [c, locations['work']]))
   else:
-    directions.append((None, [HOME, WORK]))
+    directions.append((None, [next(iter(locations['locations'].values())), locations['work']]))
 
   entries = []
   for name, direction in directions:
