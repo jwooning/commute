@@ -1,6 +1,9 @@
 # commute
 analyze traffic for possible commutes
 
+## result
+ ![commute_example](https://github.com/user-attachments/assets/f295e268-b9e5-4fb1-9394-05b8e7621dce)
+
 ## usage
 * add mapbox token:
   * create a mapbox account: https://www.mapbox.com/
