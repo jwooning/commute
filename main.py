@@ -11,6 +11,7 @@ import requests
 
 class Config:
   def __init__(self, path):
+    path = os.path.join(os.path.dirname(__file__), path)
     with open(path, 'r') as fp:
       data = json.load(fp)
 
@@ -32,10 +33,11 @@ class Commute:
     self.log_path = log_path
 
     try:
-      with open(mapbox_token_path, 'r') as fp:
+      path = os.path.join(os.path.dirname(__file__), mapbox_token_path)
+      with open(path, 'r') as fp:
         self.mapbox_token = fp.read().strip()
     except Exception:
-      print(f'cannot read {mapbox_token_path}, must be manually added, see readme')
+      print(f'cannot read {mapbox_token_path}, must be manually added, see readme', file=sys.stderr)
       sys.exit(1)
 
     self.config = Config(config_path)
